@@ -1,0 +1,50 @@
+﻿@page "/"
+@using KeyInterceptor.Services
+@inject KeyInterceptorFactory KeyInterceptorFactory
+
+<key-interceptor-options connect-to="@ElementId1">
+    <key-option key="Enter" subscribeDown="true"/>
+</key-interceptor-options>
+
+<key-interceptor-options connect-to="@ElementId2">
+    <key-option key="Enter" subscribeDown="true"/>
+</key-interceptor-options>
+
+<input id="@ElementId1" type="text"/>
+<input type="text" readonly value="@LastKeyFromElement1"/>
+
+<input id="@ElementId2" type="text"/>
+<input type="text" readonly value="@LastKeyFromElement2"/>
+
+
+@code
+{
+
+    private string ElementId1 { get; } = Guid.NewGuid().ToString();
+    private string ElementId2 { get; } = Guid.NewGuid().ToString();
+    
+    private string LastKeyFromElement1 { get; set; } = "";
+    private string LastKeyFromElement2 { get; set; } = "";
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        var keyInterceptor1 = KeyInterceptorFactory.Create();
+        var keyInterceptor2 = KeyInterceptorFactory.Create();
+        
+        keyInterceptor1.Connect(ElementId1);
+        keyInterceptor1.KeyDown += (_, args) =>
+        {
+            LastKeyFromElement1 = args.Key;
+            InvokeAsync(StateHasChanged);
+        };
+        
+        keyInterceptor2.Connect(ElementId2);
+        keyInterceptor2.KeyDown += (_, args) =>
+        {
+            LastKeyFromElement2 = args.Key;
+            InvokeAsync(StateHasChanged);
+        };
+    }
+}

@@ -1,0 +1,66 @@
+@inject IJSRuntime JsRuntime
+@implements IDisposable
+@using KeyInterceptor.Services
+@using System.Collections.Concurrent
+@inject KeyInterceptorService KeyInterceptorService
+
+@code {
+
+    private class JsInteropHelper
+    {
+        private readonly Func<string, KeyboardEventArgs, Task> _onKeyDownFunc;
+
+        public JsInteropHelper(Func<string, KeyboardEventArgs, Task> onKeyDownFunc)
+        {
+            _onKeyDownFunc = onKeyDownFunc;
+        }
+
+        [JSInvokable]
+        public Task OnKeyDown(string elementId, KeyboardEventArgs eventArgs) => _onKeyDownFunc(elementId, eventArgs);
+    }
+
+    private DotNetObjectReference<JsInteropHelper>? _dotNetObjectReference;
+    private ConcurrentDictionary<string, KeyInterceptor> _keyInterceptors = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        
+        var jsInteropHelper = new JsInteropHelper(HandleOnKeyDown);
+        _dotNetObjectReference = DotNetObjectReference.Create(jsInteropHelper);
+        
+        KeyInterceptorService.Provider = this;
+    }
+
+    private Task HandleOnKeyDown(string elementId, KeyboardEventArgs eventArgs)
+    {
+        if(_keyInterceptors.TryGetValue(elementId, out var keyInterceptor))
+            keyInterceptor.OnKeyDown(eventArgs);
+
+        return Task.CompletedTask;
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await JsRuntime.InvokeVoidAsync("window.keyInterceptor.initialize", _dotNetObjectReference);
+        }
+    }
+    
+    public void Connect(KeyInterceptor keyInterceptor, string elementId)
+    {
+        _keyInterceptors[elementId] = keyInterceptor;
+    }
+
+    public void Disconnect(KeyInterceptor keyInterceptor, string elementId)
+    {
+        _keyInterceptors.Remove(elementId, out _);
+    }
+    public void Dispose()
+    {
+        _dotNetObjectReference?.Dispose();
+    }
+}
